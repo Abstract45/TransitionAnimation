@@ -8,13 +8,91 @@
 
 import UIKit
 
-class ViewController: UIViewController {
-
+class ViewController: UIViewController, UIViewControllerTransitioningDelegate {
+    @IBOutlet weak var viewForTransition: UIView!
+    
     override func viewDidLoad() {
-        super.viewDidLoad()
-        // Do any additional setup after loading the view.
+        view.backgroundColor = .orange
     }
-
-
+    
+    @IBAction func showSecondVC() {
+        let secondVC = SecondViewController()
+        secondVC.transitioningDelegate = self
+        secondVC.modalTransitionStyle = .crossDissolve
+        present(secondVC, animated: true, completion: nil)
+    }
+    
+    lazy var animator = {
+        Animator(isPresenting: true)
+    }()
+    
+    func animationController(forPresented presented: UIViewController, presenting: UIViewController, source: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        animator.isPresenting = true
+        animator.originFrame = viewForTransition.superview!.convert(viewForTransition.frame, to: nil)
+        return animator
+    }
+    
+    func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
+        animator.isPresenting = false
+        return animator
+    }
 }
 
+class SecondViewController: UIViewController {
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .green
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(dismissMe(_:)))
+        view.addGestureRecognizer(tapGesture)
+    }
+    
+    @objc func dismissMe(_ sender: UIButton) {
+        dismiss(animated: true, completion: nil)
+    }
+}
+
+class Animator: NSObject, UIViewControllerAnimatedTransitioning {
+    
+    func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
+        return 1.0
+    }
+    
+    func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
+        guard let toView = transitionContext.view(forKey: .to),
+            let viewForTransition = isPresenting ? toView : transitionContext.view(forKey: .from) else { return }
+        
+        let initialFrame = isPresenting ? originFrame : toView.frame
+        let finalFrame = isPresenting ? toView.frame : originFrame
+        
+        let xScale = isPresenting ? initialFrame.width / finalFrame.width : finalFrame.width / initialFrame.width
+        let yScale = isPresenting ? initialFrame.height / finalFrame.height : finalFrame.height / initialFrame.height
+        
+        let scaleFactor = CGAffineTransform(scaleX: xScale, y: yScale)
+        
+        if isPresenting {
+            viewForTransition.transform = scaleFactor
+            viewForTransition.center = CGPoint(x: initialFrame.midX, y: initialFrame.midY)
+        }
+        
+        transitionContext.containerView.addSubview(toView)
+        transitionContext.containerView.bringSubviewToFront(viewForTransition)
+        
+        UIView.animate(withDuration: 1.0, animations: {
+            viewForTransition.transform = self.isPresenting ? .identity : scaleFactor
+            viewForTransition.center = CGPoint(x: finalFrame.midX, y: finalFrame.midY)
+            viewForTransition.alpha = self.isPresenting ? 1.0 : 0
+        }) { _ in
+            transitionContext.completeTransition(true)
+        }
+
+    }
+    
+    var isPresenting: Bool
+    var originFrame: CGRect = .zero
+    
+    init(isPresenting: Bool) {
+        self.isPresenting = isPresenting
+    }
+    
+}
