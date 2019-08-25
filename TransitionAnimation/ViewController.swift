@@ -34,6 +34,7 @@ class ViewController: UIViewController, UIViewControllerTransitioningDelegate {
     
     func animationController(forDismissed dismissed: UIViewController) -> UIViewControllerAnimatedTransitioning? {
         animator.isPresenting = false
+        animator.originFrame = viewForTransition.superview!.convert(viewForTransition.frame, to: dismissed.view)
         return animator
     }
 }
@@ -60,7 +61,10 @@ class Animator: NSObject, UIViewControllerAnimatedTransitioning {
     
     func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
         guard let toView = transitionContext.view(forKey: .to),
-            let viewForTransition = isPresenting ? toView : transitionContext.view(forKey: .from) else { return }
+            let viewForTransition = isPresenting ? toView : transitionContext.view(forKey: .from) else
+        {
+            return
+        }
         
         let initialFrame = isPresenting ? originFrame : toView.frame
         let finalFrame = isPresenting ? toView.frame : originFrame
@@ -71,8 +75,18 @@ class Animator: NSObject, UIViewControllerAnimatedTransitioning {
         let scaleFactor = CGAffineTransform(scaleX: xScale, y: yScale)
         
         if isPresenting {
+            guard let snapShot = toView.snapshotView(afterScreenUpdates: true) else {
+                return
+            }
+            snapShotView = snapShot
+            presentedOrientation = UIDevice.current.orientation
             viewForTransition.transform = scaleFactor
             viewForTransition.center = CGPoint(x: initialFrame.midX, y: initialFrame.midY)
+        }
+        
+
+        if (self.presentedOrientation.isPortrait && !UIDevice.current.orientation.isPortrait) || (self.presentedOrientation.isLandscape && !UIDevice.current.orientation.isLandscape)  {
+            toView.frame = CGRect(x: 0, y: 0, width: snapShotView.frame.height, height: snapShotView.frame.width)
         }
         
         transitionContext.containerView.addSubview(toView)
@@ -90,6 +104,9 @@ class Animator: NSObject, UIViewControllerAnimatedTransitioning {
     
     var isPresenting: Bool
     var originFrame: CGRect = .zero
+    var isDifferentOrientation: Bool = true
+    var presentedOrientation: UIDeviceOrientation = .portrait
+    var snapShotView: UIView = UIView()
     
     init(isPresenting: Bool) {
         self.isPresenting = isPresenting
